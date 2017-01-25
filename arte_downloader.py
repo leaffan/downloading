@@ -18,17 +18,17 @@ class ArtePlus7Downloader():
     JSON_SUFFIX = '_PLUS7-D/ALL/ALL.json'
     PROTOCOL = "HTTP"
     FORMAT = "MP4"
-    QUALITY_KEYS = {'high': 'SQ', 'medium': 'MQ', 'low': 'EQ'}
+    QUALITY_KEYS = {'high': 'SQ', 'medium': 'EQ', 'low': 'LQ'}
     DOWNLOAD_CHUNK_SIZE = 65536
     BROADCAST_ID_REGEX = re.compile("\d{6}\-\d{3}")
 
-    def __init__(self, tgt_dir, urls_media_ids, language='de', quality='low'):
+    def __init__(self, tgt_dir, urls_ids, language='de', quality='medium'):
         # setting target directory
         self.tgt_dir = tgt_dir
 
         # retrieving broadcast ids from specified string with urls and/or
         # broadcast ids
-        self.broadcast_ids = self.retrieve_broadcast_ids(urls_media_ids)
+        self.broadcast_ids = self.retrieve_broadcast_ids(urls_ids)
 
         # setting video quality to be downloaded
         if quality.lower() in self.QUALITY_KEYS:
@@ -60,6 +60,7 @@ class ArtePlus7Downloader():
         # retrieving json struct with video information
         json_data = self.retrieve_json_struct(broadcast_id)
 
+        # bailing out if no video was found for current broadcast id
         if 'custom_msg' in json_data['videoJsonPlayer']:
             print(
                 "+ Unable to retrieve video information for broadcast_id %s"
@@ -132,6 +133,7 @@ class ArtePlus7Downloader():
         from specified url.
         """
         json_url = "".join((self.JSON_PREFIX, broadcast_id, self.JSON_SUFFIX))
+        print(json_url)
         r = requests.get(json_url)
         return r.json()
 
@@ -159,9 +161,19 @@ if __name__ == '__main__':
         '-d', '--directory', dest='tgt_dir', metavar='target_directory',
         required=True, help='Target directory for video downloads.')
     arg_parser.add_argument(
+        '-l', '--language', dest='language', metavar='video language',
+        required=False, choices=['de', 'fr'],
+        help='Language of downloaded videos.')
+    arg_parser.add_argument(
+        '-q', '--quality', dest='quality', metavar='video quality',
+        required=False, choices=['high', 'medium', 'low'],
+        help='Quality of downloaded videos')
+    arg_parser.add_argument(
         'urls_or_media_ids', metavar='video_urls/media_ids',
         help='Comma-separated list of video urls or media ids.')
     args = arg_parser.parse_args()
 
-    dl = ArtePlus7Downloader(args.tgt_dir, args.urls_or_media_ids)
+    dl = ArtePlus7Downloader(
+        args.tgt_dir, args.urls_or_media_ids,
+        language=args.language, quality=args.quality)
     dl.download_all()
