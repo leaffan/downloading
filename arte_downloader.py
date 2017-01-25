@@ -120,6 +120,8 @@ class ArtePlus7Downloader():
                     break
                 handle.write(block)
                 sum_bytes += self.DOWNLOAD_CHUNK_SIZE
+                if sum_bytes > tgt_bytes:
+                    sum_bytes = tgt_bytes
                 pctg = float(sum_bytes) / tgt_bytes * 100.
                 sys.stdout.write(
                     "%d kB downloaded: %.1f%%\r" % (sum_bytes / 1024, pctg))
@@ -133,7 +135,6 @@ class ArtePlus7Downloader():
         from specified url.
         """
         json_url = "".join((self.JSON_PREFIX, broadcast_id, self.JSON_SUFFIX))
-        print(json_url)
         r = requests.get(json_url)
         return r.json()
 
@@ -162,11 +163,11 @@ if __name__ == '__main__':
         required=True, help='Target directory for video downloads.')
     arg_parser.add_argument(
         '-l', '--language', dest='language', metavar='video language',
-        required=False, choices=['de', 'fr'],
+        required=False, choices=['de', 'fr'], default='de',
         help='Language of downloaded videos.')
     arg_parser.add_argument(
         '-q', '--quality', dest='quality', metavar='video quality',
-        required=False, choices=['high', 'medium', 'low'],
+        required=False, choices=['high', 'medium', 'low'], default='medium',
         help='Quality of downloaded videos')
     arg_parser.add_argument(
         'urls_or_media_ids', metavar='video_urls/media_ids',
