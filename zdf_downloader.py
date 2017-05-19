@@ -15,9 +15,10 @@ from lxml import html
 class ZdfDownloader():
 
     QUALITY_KEYS = ['veryhigh', 'high', 'low']
-    BROADCAST_BASE_URL = "https://api.zdf.de/tmd/2/ngplayer_2_3/vod/ptmd/mediathek/"
+    BROADCAST_BASE_URL = (
+        "https://api.zdf.de/tmd/2/ngplayer_2_3/vod/ptmd/mediathek/")
     TGT_MIME_TYPE = 'video/mp4'
-    DOWNLOAD_CHUNK_SIZE = 512000
+    DOWNLOAD_CHUNK_SIZE = 524288
 
     def __init__(self, tgt_dir, urls, quality='high'):
         # setting target directory
@@ -50,14 +51,17 @@ class ZdfDownloader():
         Retrieves url to json page with video meta data. Additionally retrieves
         authorization token to be applied when accessing urls further on.
         """
-        r = requests.get(url)
-        doc = html.fromstring(r.text)
+        req = requests.get(url)
+        doc = html.fromstring(req.text)
+        # authorization api token and url to json page are contained by a
+        # json structure inside a div tag attribute value
         raw_broadcast_info = doc.xpath(
             "//article[@class='b-video-module']/descendant::div" +
             "[@class='b-playerbox b-ratiobox js-rb-live']/@data-zdfplayer-jsb")
         raw_broadcast_info = raw_broadcast_info.pop(0).strip()
         raw_broadcast_info = json.loads(raw_broadcast_info)
 
+        # retrieving actual json page url and authorization api token
         self.content_json_url = raw_broadcast_info['content']
         self.auth_api_token = raw_broadcast_info['apiToken']
         # setting up authorization headers
@@ -67,24 +71,30 @@ class ZdfDownloader():
         """
         Retrieves broadcast id for video to be downloaded.
         """
-        r = requests.get(self.content_json_url, headers=self.auth_headers)
-        j = r.json()
-        self.broadcast_id = j['mainVideoContent'][
-            'http://zdf.de/rels/target']['title']
-        self.broadcast_date = parse(j['mainVideoContent'][
-            'http://zdf.de/rels/target']['visibleFrom'])
+        req = requests.get(self.content_json_url, headers=self.auth_headers)
+        jdata = req.json()
+        # best way to retrieve broadcast is via tracking attributes for video
+        # to be downloaded
+        self.broadcast_id = jdata['tracking']['nielsen']['content']['uurl']
+        # broadcast date
+        self.broadcast_date = parse(jdata['editorialDate'])
 
     def retrieve_video_url(self):
         """
         Retrieves url to actual video file to be downloaded
         """
+        # setting url to json page containing actual stream information
         url = "".join((self.BROADCAST_BASE_URL, self.broadcast_id))
-        r = requests.get(url, headers=self.auth_headers)
-        j = r.json()
-        for variant in j['priorityList']:
+        req = requests.get(url, headers=self.auth_headers)
+        jdata = req.json()
+        for variant in jdata['priorityList']:
+            # multiple video formats are available
             for vid_format in variant['formitaeten']:
+                # choosing target video format
                 if vid_format['mimeType'] == self.TGT_MIME_TYPE:
+                    # multiple qualities are available
                     for quality in vid_format['qualities']:
+                        # choosing target video quality
                         if quality['quality'] == self.quality:
                             self.vid_url = quality['audio']['tracks'][0]['uri']
                             break
@@ -93,6 +103,7 @@ class ZdfDownloader():
         """
         Builds target file name.
         """
+        # setting up a file name containing broadcast date and id
         basename = "_".join((
             self.broadcast_date.strftime("%Y-%m-%d"), self.broadcast_id))
         return ".".join((basename, 'mp4'))
@@ -103,8 +114,8 @@ class ZdfDownloader():
         class-wide target directory.
         """
         # connecting to video url
-        r = requests.get(vid_url, stream=True)
-        tgt_bytes = int(r.headers['content-length'])
+        req = requests.get(vid_url, stream=True)
+        tgt_bytes = int(req.headers['content-length'])
         tgt_path = os.path.join(self.tgt_dir, file_name)
 
         # downloading video data
@@ -112,7 +123,7 @@ class ZdfDownloader():
             sum_bytes = 0
             print("+ Downloading %d kB to %s" % (tgt_bytes / 1024, tgt_path))
 
-            for block in r.iter_content(self.DOWNLOAD_CHUNK_SIZE):
+            for block in req.iter_content(self.DOWNLOAD_CHUNK_SIZE):
                 if not block:  # or sum_bytes > 5000000:
                     break
                 handle.write(block)
