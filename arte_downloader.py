@@ -14,11 +14,11 @@ from dateutil import parser
 class ArtePlus7Downloader():
 
     BROADCAST_ID_KEY = 'em'
-    JSON_PREFIX = 'http://arte.tv/papi/tvguide/videos/stream/player/D/'
-    JSON_SUFFIX = '_PLUS7-D/ALL/ALL.json'
-    PROTOCOL = "HTTP"
+    JSON_PREFIX = 'https://api.arte.tv/api/player/v1/config/de/'
+    PROTOCOL = "HTTPS"
     FORMAT = "MP4"
-    QUALITY_KEYS = {'high': 'SQ', 'medium': 'EQ', 'low': 'LQ'}
+    QUALITY_KEYS = {
+        'very_high': 'SQ', 'high': 'EQ', 'medium': 'HQ', 'low': 'MQ'}
     DOWNLOAD_CHUNK_SIZE = 65536
     BROADCAST_ID_REGEX = re.compile("\d{6}\-\d{3}")
 
@@ -44,7 +44,7 @@ class ArtePlus7Downloader():
 
         # combining quality and language to unique key
         self.video_key = "_".join((
-            self.PROTOCOL, self.FORMAT, self.quality, self.language))
+            self.PROTOCOL, self.quality, self.language))
 
     def download_all(self):
         """
@@ -91,7 +91,7 @@ class ArtePlus7Downloader():
         # otherwise using alternative broadcast_title
         except:
             broadcast_title = json_data['videoJsonPlayer']['VTI']
-            broadcast_title = broadcast_title.lower().replace(" ", "_")
+            broadcast_title = broadcast_title.lower().replace(" ", "_").replace("/", "-")
 
         # combining broadcast date and title to resulting title
         return "_".join((
@@ -134,7 +134,8 @@ class ArtePlus7Downloader():
         Retrieves json struct with all necessary information for video dowload
         from specified url.
         """
-        json_url = "".join((self.JSON_PREFIX, broadcast_id, self.JSON_SUFFIX))
+        json_url = "".join((self.JSON_PREFIX, broadcast_id))
+        print("+ Retrieving video information from %s" %  json_url)
         r = requests.get(json_url)
         return r.json()
 
@@ -167,8 +168,8 @@ if __name__ == '__main__':
         help='Language of downloaded videos.')
     arg_parser.add_argument(
         '-q', '--quality', dest='quality', metavar='video quality',
-        required=False, choices=['high', 'medium', 'low'], default='medium',
-        help='Quality of downloaded videos')
+        required=False, choices=['very_high', 'high', 'medium', 'low'],
+        default='high', help='Quality of downloaded videos')
     arg_parser.add_argument(
         'urls_or_media_ids', metavar='video_urls/media_ids',
         help='Comma-separated list of video urls or media ids.')
